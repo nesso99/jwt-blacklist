@@ -3,48 +3,56 @@ var filters = require("./filters");
 var _ = require("lodash");
 
 // default config for bloom filter
-jwt.conf = {
-    count: 1000000,
+jwt.defaultConfig = {
+    count: 100000,
     error: 0.001,
     type: "memory",
     expiresType: "d",
     expiresDuration: 7
 };
 
+//init with default
+jwt.filter = filters.createOptimal(
+    jwt.defaultConfig.count,
+    jwt.defaultConfig.error,
+    jwt.defaultConfig.expiresType,
+    jwt.defaultConfig.expiresDuration
+);
+
 /**
  * @param config all metric you can config : object
  */
 jwt.config = config => {
     if (!_.isObject(config)) {
-        throw new Error("config is expected an object");
+        throw new Error("config is expected to be an object");
     }
 
-    var default_ = jwt.conf;
-    jwt.conf = {
-        ...default_,
+    var conf = {
+        ...jwt.defaultConfig,
         ...config
     };
 
     // refresh the filter if change the config
-    if (jwt.filter) {
-        jwt.filter = filters.createOptimal(
-            jwt.conf.count,
-            jwt.conf.error,
-            jwt.conf.expiresType,
-            jwt.conf.expiresDuration
-        );
-    }
+    jwt.filter = filters.createOptimal(
+        conf.count,
+        conf.error,
+        conf.expiresType,
+        conf.expiresDuration
+    );
 };
 
-/**
- * init the filter with default config
- */
-jwt.filter = filters.createOptimal(
-    jwt.conf.count,
-    jwt.conf.error,
-    jwt.conf.expiresType,
-    jwt.conf.expiresDuration
-);
+// super method
+var origin = jwt.verify;
+// wrap the call back
+var wrapCallback = (token, callback) => {
+    var original = callback;
+    return function() {
+        if (_.isNull(arguments[0]) && jwt.filter.has(token)) {
+            arguments[0] = new Error("blacklist token");
+        }
+        return original.apply(this, arguments);
+    };
+};
 
 /**
  * verify if a jwt is valid
@@ -53,23 +61,24 @@ jwt.filter = filters.createOptimal(
  * @param options (optional)
  * @param callback (optional)
  */
-var origin = jwt.verify;
 jwt.verify = (...args) => {
-    if (_.isNull(args[0])) {
-        throw new Error("token is expected not null");
-    }
-
     var token = args[0];
 
-    if (jwt.filter.has(token)) {
-        var argsLength = args.length;
-        if (argsLength > 2) {
-            var callback = args[argsLength - 1];
-            callback(new Error("this token is revoked"), null);
-        }
-    } else {
+    // no call back
+    if (!_.isFunction(args[2]) && !_.isFunction(args[3])) {
         origin(...args);
+        if (jwt.filter.has(token)) throw new Error("blaclist token");
+        return;
     }
+
+    // with call back
+    if (_.isFunction(args[2])) {
+        args[2] = wrapCallback(token, args[2]);
+    }
+    if (_.isFunction(args[3])) {
+        args[3] = wrapCallback(token, args[3]);
+    }
+    origin(...args);
 };
 
 /**
