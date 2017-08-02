@@ -1,23 +1,17 @@
-var jwt = require("jsonwebtoken");
-var filters = require("./filters");
-var _ = require("lodash");
+const jwt = require("jsonwebtoken");
+const { createOptimal } = require("./filters");
+const _ = require("lodash");
+const util = require("./util");
 
 // default config for bloom filter
 jwt.defaultConfig = {
-    count: 100000,
+    maxBlacklistPerUnit: 10000,
     error: 0.001,
     type: "memory",
-    expiresType: "d",
-    expiresDuration: 7
+    unitType: "d",
+    expiresDuration: 7,
+    fileName: "jwt-data"
 };
-
-//init with default
-jwt.filter = filters.createOptimal(
-    jwt.defaultConfig.count,
-    jwt.defaultConfig.error,
-    jwt.defaultConfig.expiresType,
-    jwt.defaultConfig.expiresDuration
-);
 
 /**
  * @param config all metric you can config : object
@@ -27,71 +21,100 @@ jwt.config = config => {
         throw new Error("config is expected to be an object");
     }
 
-    var conf = {
-        ...jwt.defaultConfig,
+    util.validateConfig(config);
+
+    jwt.conf = {
+        ...jwt.conf,
         ...config
     };
 
     // refresh the filter if change the config
-    jwt.filter = filters.createOptimal(
-        conf.count,
-        conf.error,
-        conf.expiresType,
-        conf.expiresDuration
-    );
+    jwt.filter = createOptimal(jwt.conf);
 };
 
-// super method
-var origin = jwt.verify;
-// wrap the call back
+// init with default config
+jwt.config(jwt.defaultConfig);
+
+/**
+ * wrap the callback 
+ * @param {String} token the jwt token 
+ * @param {Function} callback the callback
+ */
 var wrapCallback = (token, callback) => {
-    var original = callback;
+    var callbackOrigin = callback;
     return function() {
         if (_.isNull(arguments[0]) && jwt.filter.has(token)) {
             arguments[0] = new Error("blacklist token");
         }
-        return original.apply(this, arguments);
+        return callbackOrigin.apply(this, arguments);
     };
 };
 
 /**
  * verify if a jwt is valid
- * @param token jwt token : string
- * @param secretKey secret key 
- * @param options (optional)
- * @param callback (optional)
+ * @param {String} token jwt token
+ * @param {String} secretKey secret key 
+ * @param {Object} options (optional)
+ * @param {Function} callback (optional)
  */
+var jwtVerifyOrigin = jwt.verify;
 jwt.verify = (...args) => {
     var token = args[0];
-
-    // no call back
-    if (!_.isFunction(args[2]) && !_.isFunction(args[3])) {
-        origin(...args);
-        if (jwt.filter.has(token)) throw new Error("blaclist token");
-        return;
-    }
+    var noCallback = true;
 
     // with call back
     if (_.isFunction(args[2])) {
         args[2] = wrapCallback(token, args[2]);
+        noCallback = false;
     }
     if (_.isFunction(args[3])) {
         args[3] = wrapCallback(token, args[3]);
+        noCallback = false;
     }
-    origin(...args);
+
+    var decoded = jwtVerifyOrigin(...args);
+
+    // no call back
+    if (noCallback) {
+        if (jwt.filter.has(token)) throw new Error("blaclist token");
+        return decoded;
+    }
+};
+
+/**
+ * check the valid exp
+ * @param {Object} payload jwt payload
+ */
+var validateExp = payload => {
+    var maxTTL = util.getMaxTTL(jwt.conf.unitType, jwt.conf.expiresDuration);
+    if (_.isString(payload) || _.isBuffer(payload)) return;
+    if (_.isUndefined(payload.exp) || payload.exp > maxTTL) {
+        payload.exp = maxTTL;
+    }
+};
+
+/**
+ * sign a jwt
+ * @param {Object} payload payload object or string
+ * @param {String} secretKey secret key 
+ * @param {Object} options (optional)
+ * @param {Function} callback (optional)
+ */
+var jwtSignOrigin = jwt.sign;
+jwt.sign = (...args) => {
+    validateExp(args[0]);
+    var token = jwtSignOrigin(...args);
+    return token;
 };
 
 /**
  * blacklist a token
- * @param token jwt token : string
+ * @param {String} token jwt token
  * @return true if add successfully
  */
 jwt.blacklist = token => {
-    if (!token) {
-        return false;
-    }
     if (!_.isString(token)) {
-        throw new Error("token is expected a string");
+        return false;
     }
     jwt.filter.add(token);
     return true;

@@ -1,48 +1,30 @@
 const bloomxx = require("bloomxx");
 const _ = require("lodash");
 const jwt = require("jsonwebtoken");
-
-// validate the function input
-var validateCreateOptimal = (count, error, expiresType, expiresDuration) => {
-    if (!_.isInteger(count)) throw new Error("count must be integer");
-    if (!_.indexOf(["d", "h"], expiresType) == -1)
-        throw new Error("do not support type " + expiresType + ", use h or d");
-    if (!_.isInteger(expiresDuration))
-        throw new Error("duration must be integer");
-};
+const fs = require("fs");
+const util = require("./util");
 
 /**
- * create filter with ttl
- * @param {Int} count the number of token arrive in time to live
- * @param {Double} error the error rate 0.001 ~ 0.1 %
- * @param {Enum} expiresType error type 'd' or 'h'
+ * create filter with time to live
+ * @param {Int} maxBlacklistPerUnit max blacklist times per unit
+ * @param {Double} error the error rate. 0.001 is 0.1 %
+ * @param {Enum} unitType error type 'd' or 'h'
  * @param {Int} expiresDuration time to expires depend on expiresType
  */
-var createOptimal = (count, error, expiresType, expiresDuration) => {
+var createOptimal = conf => {
     var filter = {};
     filter.data = [];
-    var unit = null;
-
-    // validate
-    validateCreateOptimal(count, error, expiresType, expiresDuration);
+    var { maxBlacklistPerUnit, error, unitType, expiresDuration } = conf;
 
     // the unit in second
-    switch (expiresType) {
-        case "h":
-            unit = 3600;
-            break;
-        case "d":
-            unit = 86400;
-            break;
-        default:
-            throw new Error("do not support " + expiresType + " type");
-    }
+    var unit = util.getUnitInSecond(unitType);
 
-    // add the filter
-    for (var i = 0; i <= expiresDuration; i++) {
-        filter.data.push(
-            bloomxx.BloomFilter.createOptimal(count / expiresDuration, error)
-        );
+    if (filter.data.length == 0) {
+        for (var i = 0; i <= expiresDuration; i++) {
+            filter.data.push(
+                bloomxx.BloomFilter.createOptimal(maxBlacklistPerUnit, error)
+            );
+        }
     }
 
     // default value
@@ -64,11 +46,16 @@ var createOptimal = (count, error, expiresType, expiresDuration) => {
             distance -= unit;
         }
 
-        var decoded = jwt.decode(token);
+        try {
+            var decoded = jwt.decode(token);
+        } catch (err) {
+            console.log(err);
+            return;
+        }
         var exp = decoded.exp;
 
         if (_.isUndefined(exp) || _.isNull(exp) || exp <= now) {
-            console.log("the expire time is invalid");
+            console.log("the expire time is missing or expired");
             return;
         }
 

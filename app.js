@@ -26,11 +26,6 @@ server.connection({
     port: 3000
 });
 
-jwt.config({
-    count: 10000000,
-    error: 0.0001 // 0.01%
-});
-
 // Add the route
 server.route([
     {
