@@ -44,6 +44,20 @@ describe("Basic function", function() {
         });
     });
 
+    it("add a token with very big ttl", function(done) {
+        var token = jwt.sign(
+            {
+                greate: "awesome-lala",
+                exp: Math.floor(Date.now() / 1000) + 365 * 86400
+            },
+            secretKey
+        );
+        jwt.verify(token, secretKey, function(err, decoded) {
+            assert.equal(err, null, "expected err is not null");
+            done();
+        });
+    });
+
     it("error because of invalid unit type", function() {
         assert.throws(() => {
             jwt.config({
