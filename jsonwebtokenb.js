@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const { createOptimal } = require("./filters");
 const _ = require("lodash");
+const ms = require("ms");
 const util = require("./util");
 
 // default config for bloom filter
@@ -82,18 +83,6 @@ jwt.verify = (...args) => {
 };
 
 /**
- * check the valid exp
- * @param {Object} payload jwt payload
- */
-var validateExp = payload => {
-    var maxTTL = util.getMaxTTL(jwt.conf.unitType, jwt.conf.expiresDuration);
-    if (_.isString(payload) || _.isBuffer(payload)) return;
-    if (_.isUndefined(payload.exp) || payload.exp > maxTTL) {
-        payload.exp = maxTTL;
-    }
-};
-
-/**
  * sign a jwt
  * @param {Object} payload payload object or string
  * @param {String} secretKey secret key 
@@ -102,8 +91,40 @@ var validateExp = payload => {
  */
 var jwtSignOrigin = jwt.sign;
 jwt.sign = (...args) => {
-    validateExp(args[0]);
+    var exp = 0;
+    // args[0] is payload
+    var options = args[2];
+
+    // compute EXP in options if exists
+    if (_.isObject(options)) {
+        if (_.isString(options.expiresIn)) {
+            exp = Math.floor((Date.now() + ms(options.expiresIn)) / 1000);
+        } else if (_.isInteger(options.expiresIn)) {
+            exp = Math.floor(Date.now() / 1000) + options.expiresIn;
+        }
+
+        // revoke the options.expiresIn
+        delete args[2].expireIn;
+    }
+
+    // re assign args[0] if payload is object
+    if (_.isObject(args[0])) {
+        // exp > 0 when it is configure in options
+        exp = exp > 0 ? exp : args[0].exp || 0;
+
+        if (exp > 0) {
+            var maxEXP = util.getMaxEXP(
+                jwt.conf.unitType,
+                jwt.conf.expiresDuration
+            );
+            exp = exp > maxEXP ? maxEXP : exp;
+
+            args[0].exp = exp;
+        }
+    }
+
     var token = jwtSignOrigin(...args);
+
     return token;
 };
 

@@ -2,6 +2,12 @@ const _ = require("lodash");
 
 var util = {};
 
+/**
+ * return the unit in second
+ * type 'h' is hour, unit in second is 3600
+ * type 'd' is hour, unit in second is 86400
+ * @param {String} unitType the unit in hour or day
+ */
 util.getUnitInSecond = unitType => {
     var unit = null;
     switch (unitType) {
@@ -17,11 +23,20 @@ util.getUnitInSecond = unitType => {
     return unit;
 };
 
-util.getMaxTTL = (unitType, expiresDuration) => {
+/**
+ * return the maximum time to live of a jwt is allowed
+ * in filter
+ * @param {String} unitType the unitType is hour or day
+ * @param {Int} expiresDuration the duration
+ */
+util.getMaxEXP = (unitType, expiresDuration) => {
     var unit = util.getUnitInSecond(unitType);
     return Math.floor(Date.now() / 1000) + unit * expiresDuration;
 };
 
+/**
+ * validate the config of filter
+ */
 util.validateConfig = conf => {
     if (!_.isObject(conf)) throw new Error("config should be an object");
     const {

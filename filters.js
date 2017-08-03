@@ -12,6 +12,9 @@ const util = require("./util");
  * @param {Int} expiresDuration time to expires depend on expiresType
  */
 var createOptimal = conf => {
+    //TODO: if filter existed in file, rebuild the filter
+
+    // if not, create a brand new filter
     var filter = {};
     filter.data = [];
     var { maxBlacklistPerUnit, error, unitType, expiresDuration } = conf;
@@ -19,33 +22,47 @@ var createOptimal = conf => {
     // the unit in second
     var unit = util.getUnitInSecond(unitType);
 
-    if (filter.data.length == 0) {
-        for (var i = 0; i <= expiresDuration; i++) {
-            filter.data.push(
-                bloomxx.BloomFilter.createOptimal(maxBlacklistPerUnit, error)
-            );
-        }
+    for (var i = 0; i <= expiresDuration; i++) {
+        filter.data.push(
+            bloomxx.BloomFilter.createOptimal(maxBlacklistPerUnit, error)
+        );
     }
 
-    // default value
-    var first = 0;
-    var date = Math.floor(Date.now() / 1000); // now in second
+    /**
+     * empty the filter
+     */
+    filter.clear = () => {
+        for (var i = 0; i < filter.data.length; i++) {
+            filter.data[i].clear();
+        }
+    };
+
+    // anchor for now
+    filter.first = 0;
+    filter.originalNow = Math.floor(Date.now() / 1000); // now in second
 
     /**
      * add a key to bloom
      * @param {String} token the jwt token
      */
     filter.add = token => {
-        // update first and date
+        // update first and originalNow
         var now = Math.floor(Date.now() / 1000);
-        var distance = now - date;
-        while (distance >= unit) {
-            filter.data[first].clear();
-            first = (first + 1) % (expiresDuration + 1);
-            date += unit;
-            distance -= unit;
+        var distance = Math.floor((now - filter.originalNow) / unit);
+        filter.originalNow += distance * unit;
+
+        // update the anchor
+        if (distance > expiresDuration) {
+            filter.clear();
+        } else {
+            while (distance > 0) {
+                filter.data[first].clear();
+                filter.first = (filter.first + 1) % (expiresDuration + 1);
+                distance -= 1;
+            }
         }
 
+        // check the exp of jwt
         try {
             var decoded = jwt.decode(token);
         } catch (err) {
@@ -54,13 +71,14 @@ var createOptimal = conf => {
         }
         var exp = decoded.exp;
 
-        if (_.isUndefined(exp) || _.isNull(exp) || exp <= now) {
+        // the jwt does not have exp
+        if (_.isNil(exp) || exp <= filter.originalNow) {
             console.log("the expire time is missing or expired");
             return;
         }
 
         // choose jwt position in array
-        var distance = Math.floor((exp - date) / unit);
+        var distance = Math.floor((exp - filter.originalNow) / unit);
         if (distance > expiresDuration) {
             console.log(
                 "WARNING! " +
@@ -69,8 +87,10 @@ var createOptimal = conf => {
             );
             distance = expiresDuration;
         }
-        var position = (first + distance) % (expiresDuration + 1);
+        var position = (filter.first + distance) % (expiresDuration + 1);
         filter.data[position].add(token);
+
+        //TODO: update the filter to file
     };
 
     /**
@@ -82,15 +102,6 @@ var createOptimal = conf => {
             if (filter.data[i].has(token)) return true;
         }
         return false;
-    };
-
-    /**
-     * empty the filter
-     */
-    filter.clear = () => {
-        for (var i = 0; i < filter.data.length; i++) {
-            filter.data[i].clear();
-        }
     };
 
     return filter;
