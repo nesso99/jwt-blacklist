@@ -1,28 +1,27 @@
 {
-  "name": "jwt-blacklist",
-  "version": "1.0.0",
-  "description": "",
-  "main": "app.js",
-  "scripts": {
-    "start": "nodemon app.js --exec babel-node",
-    "test": "mocha --compilers js:babel-register"
-  },
-  "author": "ducpham",
-  "license": "ISC",
-  "dependencies": {
-    "bloomxx": "0.0.5",
-    "bson": "^1.0.4",
-    "jsonwebtoken": "^7.4.1",
-    "lodash": "^4.17.4",
-    "ms": "^2.0.0"
-  },
-  "devDependencies": {
-    "aguid": "^2.0.0",
-    "babel-cli": "^6.24.1",
-    "babel-preset-es2015": "^6.24.1",
-    "babel-preset-stage-2": "^6.24.1",
-    "babel-register": "^6.24.1",
-    "hapi": "^16.5.0",
-    "mocha": "^3.4.2"
-  }
+    "name": "jwt-blacklist",
+    "version": "1.0.0",
+    "description": "",
+    "main": "app.js",
+    "scripts": {
+        "start": "nodemon app.js --exec babel-node",
+        "test": "mocha --compilers js:babel-register"
+    },
+    "author": "ducpham",
+    "license": "ISC",
+    "dependencies": {
+        "bloomxx": "0.0.5",
+        "lodash": "^4.17.4",
+        "ms": "^2.0.0"
+    },
+    "devDependencies": {
+        "aguid": "^2.0.0",
+        "babel-cli": "^6.24.1",
+        "babel-preset-es2015": "^6.24.1",
+        "babel-preset-stage-2": "^6.24.1",
+        "babel-register": "^6.24.1",
+        "hapi": "^16.5.0",
+        "mocha": "^3.4.2",
+        "jsonwebtoken": "^7.4.1"
+    }
 }

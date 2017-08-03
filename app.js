@@ -1,6 +1,7 @@
 const Hapi = require("hapi");
-const jwt = require("./jsonwebtokenb");
-var aguid = require("aguid");
+const jwt_ = require("jsonwebtoken");
+const aguid = require("aguid");
+const jwt = require("./lib/jsonwebtokenb")(jwt_);
 
 const cookie_options = {
     ttl: 365 * 24 * 60 * 60 * 1000, // expires a year from today
@@ -45,7 +46,7 @@ server.route([
             var password = request.payload.password;
             var token = jwt.sign(
                 {
-                    exp: Math.floor(Date.now() / 1000) + 60 * 60, // s unit
+                    exp: Math.floor(Date.now() / 1000) + 2 * 60 * 60, // s unit
                     id: aguid(),
                     username: username
                 },
