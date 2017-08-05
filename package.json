@@ -1,6 +1,6 @@
 {
     "name": "jwt-blacklist",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "A module based on node-jsonwebtoken with blacklisting feature.",
     "main": "index.js",
     "repository": {
@@ -8,7 +8,9 @@
         "url": "git+https://github.com/nesso99/jwt-blacklist.git"
     },
     "scripts": {
-        "test": "mocha --compilers js:babel-register"
+        "test": "mocha --compilers js:babel-register",
+        "build": "babel lib -d dist",
+        "prepublish": "npm run build"
     },
     "author": "ducpham",
     "license": "GPL-3.0",
