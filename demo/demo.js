@@ -1,7 +1,11 @@
+/**
+ * YOU NEED TO ADD ADDITIONAL MODULES TO RUN DEMO
+ */
+
 const Hapi = require("hapi");
 const jwt_ = require("jsonwebtoken");
 const aguid = require("aguid");
-const jwt = require("./lib/jsonwebtokenb")(jwt_);
+const jwt = require("jwt-blacklist")(jwt_);
 
 const cookie_options = {
     ttl: 365 * 24 * 60 * 60 * 1000, // expires a year from today
