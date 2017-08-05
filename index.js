@@ -1,3 +1,3 @@
-const jwtBlacklist = require("./lib/jsonwebtokenb");
+const jwtBlacklist = require("./dist/jsonwebtokenb");
 
 module.exports = jwtBlacklist;
